@@ -4,27 +4,43 @@ from collections import namedtuple
 
 AhpResult = namedtuple('AhpResult', ['prio_weights', 'cr', 'ci'])
 AlgoInput = namedtuple('AlgoInput', ['criteria_mat', 'n', 'IR', 'benefit_cols', 'alternatives', 'v', 'id_columns'])
+AlgoResult = namedtuple('AlgoResult', ['sorted', 'result', 'index_sorted', 'index_result'])
 
-def ahp(criteria_mat, n, IR):
+def ahp(criteria_mat, n, IR, columns=None):
+    if columns is None:
+        raise Exception('columns cant be None')
     # Sum by column
     column_sum = criteria_mat.sum(axis=0)
 
     # Normalize it
     normed = criteria_mat / column_sum
+    # print('normed.shape=', normed.shape)
 
     # Sum the rows
     sum_row = normed.sum(axis=1)
 
     # compute "priority weights"
     prio_weights = sum_row / 6.0
+    # print('prio_weights.shape=', prio_weights.shape)
 
     # Stack to right
     norm_mat = np.column_stack((normed, sum_row, prio_weights))
+    # print('norm_mat.shape=', norm_mat.shape)
 
     Σ_hk = (criteria_mat * prio_weights).sum(axis=1)
+    # print('sum_hk.shape=', Σ_hk.shape)
     # print('Hasil kali: ', Σ_hk)
     Σ_hk_prio = Σ_hk / prio_weights
+    # print('sum_hk_prio.shape=', Σ_hk_prio.shape)
     # print('Weight Hasil kali: ', Σ_hk_prio)
+
+    view_columns = columns + ['sum', 'prio_weights']
+    test = pd.DataFrame(
+        data=np.column_stack((normed, sum_row, prio_weights)),
+        columns=view_columns,
+        index=columns
+    )
+    print(test)
 
     Σλ = Σ_hk_prio.sum()
     λ_max = Σλ.max() / n
@@ -69,10 +85,14 @@ def vikor(alternatives, weights, benefit_cols, v=0.5):
     # print()
 
     norm = (best - alternatives) / (best - worst)
+    # print('normalisasi vikor')
     # print(norm)
+    # print()
     # exit()
 
     t1 = norm * weights
+    # print('weights=', weights)
+    # print('norm * weights')
     # print(t1)
     # print()
     
@@ -100,18 +120,21 @@ def vikor(alternatives, weights, benefit_cols, v=0.5):
     return np.column_stack((t1, si, ri, Q))
 
 def main_algo(_input: AlgoInput):
-    ahp_result = ahp(_input.criteria_mat, _input.alternatives.shape[0], _input.IR)
-    vikor_result = vikor(_input.alternatives, ahp_result.prio_weights, _input.benefit_cols, _input.v)
-
     crit_columns = list( f'C{i}' for i in range(1, _input.alternatives.shape[1] + 1))
     vik_columns = crit_columns + [ 'S', 'R', 'Q' ]
     index = _input.id_columns if _input.id_columns is not None else range(1, _input.alternatives.shape[0])
+
+    ahp_result = ahp(_input.criteria_mat, _input.alternatives.shape[0], _input.IR, columns=crit_columns)
+    vikor_result = vikor(_input.alternatives, ahp_result.prio_weights, _input.benefit_cols, _input.v)
 
     # print('vikor_result=', vikor_result.shape)
     # print('columns=', len(vik_columns))
     # print('index=', len(index))
     with_q = pd.DataFrame(data=vikor_result, columns=vik_columns, index=index)
+    # print()
+    # print('SI RI QI')
     # print(with_q)
+    # print()
 
     sorted_q = with_q.sort_values(by=['Q'])
 
@@ -127,12 +150,28 @@ def main_algo(_input: AlgoInput):
     C1 = (sorted_q['Q'][1] - sorted_q['Q'][0]) > DQ
     C2 = top_q_index == top_r_index == top_s_index
 
-    if C1 and not C2:
-        return sorted_q.iloc[0:2]
-    if not C1:
-        return sorted_q.loc[sorted_q['Q'] < DQ]
+    print('C1=', C1)
+    print('C2=', C2)
+
+    # print(sorted_q)
+    sorted_result = None
+    if C1 and C2:
+        print('HERE')
+        sorted_result = sorted_q.iloc[0:1]
+        print('sorted')
+        print(sorted_result)
+        print()
+    elif C1 and not C2:
+        sorted_result = sorted_q.iloc[0:2]
+    elif not C1:
+        sorted_result = sorted_q.loc[sorted_q['Q'] < DQ]
+    else:
+        sorted_result = sorted_q.iloc[0:]
     
-    return sorted_q.loc[0]
+    index_sorted = sorted_result.index.values
+    index_result = sorted_q.index.values
+
+    return AlgoResult(sorted=sorted_result, result=sorted_q, index_sorted=index_sorted, index_result=index_result)
 
 if __name__ == '__main__':
     crit = np.array([
@@ -155,7 +194,7 @@ if __name__ == '__main__':
     v = 0.5
     IR = 1.24
 
-    index_cols = ['Jl. Amabi', 'Jl. Nangka', 'Jl. Jend. Soeharto', 'Jl. H.R. Koroh', 'Jl. Cak Doko', 'A']
+    index_cols = ['Jl. Amabi', 'Jl. Nangka', 'Jl. Jend. Soeharto', 'Jl. S.K. Lerik', 'Jl. Cak Doko', 'Jln. Thamrin']
 
     algo_input = AlgoInput(criteria_mat=crit, 
                       alternatives=alternatives, 
@@ -166,5 +205,7 @@ if __name__ == '__main__':
                       n=alternatives.shape[0])
 
     result = main_algo(algo_input)
-
-    print(result)
+    # print(result.result)
+    # print()
+    # print(result.sorted)
+    # print()

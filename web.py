@@ -5,7 +5,7 @@ from flask_cors import CORS
 import numpy as np
 from ninda2 import ahpvikor
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 CORS(app)
 
 @app.route('/rank', methods=['POST'])
@@ -26,6 +26,12 @@ def rank():
                       id_columns=indices,
                       n=alternatives.shape[0])
     result = ahpvikor.main_algo(algo_input)
-    print('result=', result)
-    return result.to_json(orient='table')
+    print(type(result.sorted))
+    dict_result = {
+      'sorted': result.sorted.to_dict('records'),
+      'result': result.result.to_dict('records'),
+      'index_sorted': result.index_sorted.tolist(),
+      'index_result': result.index_result.tolist()
+    }
+    return jsonify(dict_result)
 
