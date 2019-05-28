@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 from collections import namedtuple
 
-AhpResult = namedtuple('AhpResult', ['prio_weights', 'cr', 'ci'])
+AhpResult = namedtuple('AhpResult', ['prio_weights', 'cr', 'ci', 'ratio_matrix'])
 AlgoInput = namedtuple('AlgoInput', ['criteria_mat', 'n', 'IR', 'benefit_cols', 'alternatives', 'v', 'id_columns'])
-AlgoResult = namedtuple('AlgoResult', ['sorted', 'result', 'index_sorted', 'index_result'])
+AlgoResult = namedtuple('AlgoResult', ['sorted', 'result', 'index_sorted', 'index_result', 'ahp_result'])
 
 def ahp(criteria_mat, n, IR, columns=None):
     if columns is None:
@@ -35,12 +35,11 @@ def ahp(criteria_mat, n, IR, columns=None):
     # print('Weight Hasil kali: ', Σ_hk_prio)
 
     view_columns = columns + ['sum', 'prio_weights']
-    test = pd.DataFrame(
+    ratio_matrix = pd.DataFrame(
         data=np.column_stack((normed, sum_row, prio_weights)),
         columns=view_columns,
         index=columns
     )
-    print(test)
 
     Σλ = Σ_hk_prio.sum()
     λ_max = Σλ.max() / n
@@ -51,9 +50,7 @@ def ahp(criteria_mat, n, IR, columns=None):
     # print('CI=', CI)
     # print('CR=', CR)
 
-    ahp_result = AhpResult(prio_weights=prio_weights, cr=CR, ci=CI)
-    
-    # print( pd.DataFrame(data=np.column_stack((normed, prio_weights)), columns=(list( f'C{i + 1}' for i in range(n) )) + ['W']))
+    ahp_result = AhpResult(prio_weights=prio_weights, cr=CR, ci=CI, ratio_matrix=ratio_matrix)
 
     return ahp_result
     
@@ -76,25 +73,28 @@ def best_worst(mat_alt, benefit_cols):
 
 def vikor(alternatives, weights, benefit_cols, v=0.5):
     best, worst = best_worst(alternatives, benefit_cols)
-    # print('best: ')
-    # print(best)
-    # print()
+    print('best: ')
+    print(best)
+    print()
 
-    # print('worst: ')
-    # print(worst)
-    # print()
+    print('worst: ')
+    print(worst)
+    print()
 
     norm = (best - alternatives) / (best - worst)
-    # print('normalisasi vikor')
-    # print(norm)
-    # print()
+    print('normalisasi vikor')
+    print(norm)
+    print()
     # exit()
 
     t1 = norm * weights
-    # print('weights=', weights)
-    # print('norm * weights')
-    # print(t1)
-    # print()
+    print('bobot')
+    print(weights)
+    print()
+
+    print('normalisasi * bobot')
+    print(t1)
+    print()
     
     si = t1.sum(axis=1)
     ri = np.max(t1, axis=1)
@@ -150,17 +150,17 @@ def main_algo(_input: AlgoInput):
     C1 = (sorted_q['Q'][1] - sorted_q['Q'][0]) > DQ
     C2 = top_q_index == top_r_index == top_s_index
 
-    print('C1=', C1)
-    print('C2=', C2)
+    # print('C1=', C1)
+    # print('C2=', C2)
 
     # print(sorted_q)
     sorted_result = None
     if C1 and C2:
-        print('HERE')
+        # print('HERE')
         sorted_result = sorted_q.iloc[0:1]
-        print('sorted')
-        print(sorted_result)
-        print()
+        # print('sorted')
+        # print(sorted_result)
+        # print()
     elif C1 and not C2:
         sorted_result = sorted_q.iloc[0:2]
     elif not C1:
@@ -171,7 +171,11 @@ def main_algo(_input: AlgoInput):
     index_sorted = sorted_result.index.values
     index_result = sorted_q.index.values
 
-    return AlgoResult(sorted=sorted_result, result=sorted_q, index_sorted=index_sorted, index_result=index_result)
+    return AlgoResult(sorted=sorted_result,
+        result=sorted_q,
+        index_sorted=index_sorted,
+        index_result=index_result,
+        ahp_result=ahp_result)
 
 if __name__ == '__main__':
     crit = np.array([
